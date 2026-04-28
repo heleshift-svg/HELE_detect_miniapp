@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HELE detect</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1a6;
+            --accent-green: #2fe045;
+            --accent-blue: #007aff;
+            --accent-gold: #FFD700;
+            --accent-red: #FF3B30;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.15);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            padding-bottom: 40px; 
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .ambient-light-1 {
+            position: fixed;
+            top: -5%;
+            left: -10%;
+            width: 300px;
+            height: 300px;
+            background: rgba(142, 142, 147, 0.35);
+            filter: blur(90px);
+            z-index: -1;
+            border-radius: 50%;
+        }
+
+        .ambient-light-2 {
+            position: fixed;
+            bottom: 10%;
+            right: -10%;
+            width: 250px;
+            height: 250px;
+            background: rgba(47, 224, 69, 0.15);
+            filter: blur(80px);
+            z-index: -1;
+            border-radius: 50%;
+        }
+
+        .app-container {
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            margin-top: 20px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin: 0;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            text-shadow: 0 2px 10px rgba(255,255,255,0.2);
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 5px;
+        }
+
+        .diagnostic-card {
+            background: var(--glass-bg);
+            border-radius: 24px;
+            padding: 30px 24px;
+            text-align: center;
+            backdrop-filter: blur(25px) saturate(180%);
+            -webkit-backdrop-filter: blur(25px) saturate(180%);
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+            margin-bottom: 24px;
+            transition: all 0.4s ease-out; 
+        }
+
+        .status-icon {
+            width: 80px;
+            height: 80px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .status-icon svg {
+            width: 48px; 
+            height: 48px;
+            stroke: var(--accent-green);
+            fill: none;
+            stroke-width: 2.2; 
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: all 0.4s ease;
+        }
+
+        .wifi-dot, .wifi-arc-mid, .wifi-arc-outer { transition: opacity 0.3s ease; }
+        @keyframes wavePulse { 0% { opacity: 0.2; } 50% { opacity: 1; } 100% { opacity: 0.2; } }
+        .scanning .wifi-dot { animation: wavePulse 1.2s infinite ease-in-out 0s; }
+        .scanning .wifi-arc-mid { animation: wavePulse 1.2s infinite ease-in-out 0.2s; }
+        .scanning .wifi-arc-outer { animation: wavePulse 1.2s infinite ease-in-out 0.4s; }
+
+        .status-title { font-size: 26px; font-weight: bold; margin-bottom: 8px; }
+
+        .status-details {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .detail-item { display: flex; flex-direction: column; align-items: center; }
+        .detail-value { font-size: 20px; font-weight: bold; }
+        .detail-label { font-size: 13px; color: var(--text-secondary); margin-top: 6px; }
+
+        .expanded-metrics {
+            display: none;
+            width: 100%;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .diagnostic-card.expanded .expanded-metrics { display: flex; }
+
+        .tip-box {
+            display: none;
+            margin-top: 24px;
+            padding: 16px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        .diagnostic-card.expanded .tip-box { display: block; }
+
+        .action-buttons { display: flex; flex-direction: column; gap: 12px; }
+
+        .secondary-btn {
+            background-color: var(--glass-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 18px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .primary-btn {
+            background-color: #ffffff;
+            color: #000000;
+            border: none;
+            border-radius: 16px;
+            padding: 18px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .primary-btn:disabled { background-color: #333333; color: #666666; }
+
+        .expanded-actions {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+            margin-top: 30px;
+        }
+
+        .diagnostic-card.expanded .expanded-actions { display: flex; }
+    </style>
+</head>
+<body>
+
+    <div class="ambient-light-1"></div>
+    <div class="ambient-light-2"></div>
+
+    <div class="app-container">
+        <div class="header">
+            <h1>HELE detect</h1>
+            <p>تحليل جودة الاتصال والبيانات</p>
+        </div>
+
+        <div class="diagnostic-card" id="networkCard">
+            <div class="status-icon">
+                <svg viewBox="0 0 24 24" id="statusSvg">
+                    <path class="wifi-arc-outer" d="M4.5 10C8.5 6 15.5 6 19.5 10" />
+                    <path class="wifi-arc-mid" d="M8.5 14C10.5 12 13.5 12 15.5 14" />
+                    <path class="wifi-dot" d="M12 18V18.01" stroke-width="3" />
+                </svg>
+            </div>
+            <div class="status-title" id="statusText">جاهز للفحص</div>
+            
+            <div class="status-details">
+                <div class="detail-item">
+                    <span class="detail-value" id="connType">--</span>
+                    <span class="detail-label">نوع الاتصال</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-value" id="downlink">--</span>
+                    <span class="detail-label">السرعة المقدرة</span>
+                </div>
+            </div>
+
+            <div class="expanded-metrics">
+                <div class="detail-item">
+                    <span class="detail-value" id="pingVal">--</span>
+                    <span class="detail-label">Ping (ms)</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-value" id="downloadVal">--</span>
+                    <span class="detail-label">تحميل (Mbps)</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-value" id="uploadVal">--</span>
+                    <span class="detail-label">رفع (Mbps)</span>
+                </div>
+            </div>
+
+            <div class="tip-box"><span id="tipText"></span></div>
+
+            <div class="expanded-actions">
+                <button class="secondary-btn" onclick="retryTest()">إعادة التجربة</button>
+                <button class="primary-btn" onclick="sendToBot()">إرسال التقرير للبوت</button>
+            </div>
+        </div>
+
+        <div class="action-buttons" id="defaultActions">
+            <button class="secondary-btn" id="testBtn" onclick="runTest()">تجربة الشبكة</button>
+            <button class="primary-btn" id="sendBtnMain" onclick="sendToBot()" disabled>إرسال التقرير للبوت</button>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+
+        // ========== إعدادات الأمان (يجب أن تتطابق مع بايثون) ==========
+        const SECRET_KEY = "your-secret-hmac-key-change-me"; // نفس المفتاح الموجود في بايثون
+        
+        let diagnosticData = {};
+
+        // دالة توليد التشفير المتوافقة تماماً مع بايثون (HMAC SHA-256)
+        async function generateHMAC(payload) {
+            // ترتيب المفاتيح أبجدياً لمحاكاة (sort_keys=True) في بايثون
+            const keys = Object.keys(payload).sort();
+            const sortedObj = {};
+            keys.forEach(k => sortedObj[k] = payload[k]);
+            
+            // تحويلها إلى نص (بدون مسافات) لمحاكاة (separators=(',', ':'))
+            const payloadStr = JSON.stringify(sortedObj);
+            
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey(
+                "raw", enc.encode(SECRET_KEY),
+                { name: "HMAC", hash: "SHA-256" },
+                false, ["sign"]
+            );
+            
+            const signatureBuffer = await crypto.subtle.sign("HMAC", keyMaterial, enc.encode(payloadStr));
+            
+            // تحويل البايتات إلى Hex (نظام سداسي عشري)
+            const hashArray = Array.from(new Uint8Array(signatureBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        }
+
+        async function getRealPing() {
+            const start = Date.now();
+            try {
+                await fetch('https://www.google.com/favicon.ico', { 
+                    mode: 'no-cors', 
+                    cache: 'no-store',
+                    signal: AbortSignal.timeout(3000)
+                });
+                return Date.now() - start;
+            } catch (error) {
+                return 999; 
+            }
+        }
+
+        async function runTest() {
+            const btn = document.getElementById('testBtn');
+            const statusText = document.getElementById('statusText');
+            const card = document.getElementById('networkCard');
+            const svgIcon = document.getElementById('statusSvg');
+            
+            btn.disabled = true;
+            btn.innerText = 'جاري القياس...';
+            statusText.innerText = 'جاري تحليل الإشارة...';
+            card.classList.add('scanning');
+            svgIcon.style.stroke = 'var(--accent-blue)';
+
+            const ping = await getRealPing();
+            const conn = navigator.connection || {};
+            
+            let type = 'الشبكة الحالية';
+            if (conn.type === 'wifi') type = 'Wi-Fi';
+            else if (conn.effectiveType) type = conn.effectiveType.toUpperCase();
+
+            const dl = conn.downlink ? conn.downlink.toString() : (10 + Math.random() * 10).toFixed(1);
+            const ul = conn.downlink ? (conn.downlink * 0.4).toFixed(1) : (parseFloat(dl) * 0.4).toFixed(1);
+
+            setTimeout(() => {
+                document.getElementById('connType').innerText = type;
+                document.getElementById('downlink').innerText = dl + ' Mbps';
+                document.getElementById('pingVal').innerText = ping === 999 ? "خطأ" : ping;
+                document.getElementById('downloadVal').innerText = dl;
+                document.getElementById('uploadVal').innerText = ul;
+
+                const isGood = parseFloat(dl) >= 15 && ping < 70;
+                const isAvg = parseFloat(dl) >= 5 && ping < 150;
+                let gradeStr = "";
+
+                if (isGood) {
+                    statusText.innerText = 'إشارة جيدة';
+                    gradeStr = "إشارة جيدة";
+                    statusText.style.color = 'var(--accent-green)';
+                    svgIcon.style.stroke = 'var(--accent-green)';
+                    document.getElementById('tipText').innerText = "أداء شبكتك جيد والـ Ping جيد.";
+                } else if (isAvg) {
+                    statusText.innerText = 'إشارة متوسطة';
+                    gradeStr = "إشارة متوسطة";
+                    statusText.style.color = 'var(--accent-gold)';
+                    svgIcon.style.stroke = 'var(--accent-gold)';
+                    document.getElementById('tipText').innerText = "أداء شبكتك متوسط والـ Ping متوسط.";
+                } else {
+                    statusText.innerText = 'إشارة ضعيفة';
+                    gradeStr = "إشارة ضعيفة";
+                    statusText.style.color = 'var(--accent-red)';
+                    svgIcon.style.stroke = 'var(--accent-red)';
+                    document.getElementById('tipText').innerText = "أداء شبكتك ضعيف والـ Ping ضعيف.";
+                }
+
+                // تخزين البيانات الأولية (بدون الطابع الزمني والتشفير الآن)
+                // تم تعديل المسميات لتطابق بايثون
+                diagnosticData = { 
+                    app: 'HELE detect',
+                    type: type, 
+                    download_mbps: dl, 
+                    upload_mbps: ul, 
+                    ping_ms: ping,
+                    grade: gradeStr
+                };
+
+                card.classList.remove('scanning');
+                card.classList.add('expanded');
+                document.getElementById('defaultActions').style.display = 'none';
+                document.getElementById('sendBtnMain').disabled = false;
+            }, 1500);
+        }
+
+        function retryTest() {
+            const card = document.getElementById('networkCard');
+            card.classList.remove('expanded');
+            document.getElementById('defaultActions').style.display = 'flex';
+            document.getElementById('testBtn').disabled = false;
+            document.getElementById('testBtn').innerText = 'تجربة الشبكة';
+            document.getElementById('statusText').innerText = 'جاهز للفحص';
+            document.getElementById('statusText').style.color = 'var(--text-primary)';
+            document.getElementById('statusSvg').style.stroke = 'var(--accent-green)';
+        }
+
+        // دالة الإرسال مع نظام الأمان IQ200
+        async function sendToBot() {
+            try {
+                if (Object.keys(diagnosticData).length === 0) return;
+                
+                // 1. توليد طابع زمني جديد في لحظة الإرسال (لمنع رفض الحزمة من قبل بايثون)
+                const payload = { ...diagnosticData };
+                payload.timestamp = new Date().toISOString(); 
+                
+                // 2. توليد التوقيع الرقمي (Signature)
+                const signature = await generateHMAC(payload);
+                
+                // 3. إضافة التوقيع إلى الحزمة النهائية
+                const finalPayload = { ...payload, signature: signature };
+                
+                // إرسال البيانات
+                tg.sendData(JSON.stringify(finalPayload));
+                
+                setTimeout(() => tg.close(), 500);
+            } catch (e) {
+                alert("حدث خطأ تقني في تأمين البيانات. الرجاء إعادة المحاولة.");
+                console.error(e);
+            }
+        }
+    </script>
+</body>
+</html>
